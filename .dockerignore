@@ -1,0 +1,11 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.cache/
+.git/
+.gitignore
+*.md
+.env
+.env.*
+.streamlit/secrets.toml

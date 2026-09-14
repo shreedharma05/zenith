@@ -1,0 +1,8 @@
+# Replace with your Oracle VM's public IP, dashes instead of dots, e.g.
+# 130.61.10.5 -> 130-61-10-5.sslip.io
+# Caddy will automatically request and renew a free Let's Encrypt certificate
+# for this hostname the first time it starts (needs ports 80 + 443 reachable
+# from the internet for the ACME HTTP challenge).
+your-vm-ip-here.sslip.io {
+    reverse_proxy zenith-api:8000
+}
