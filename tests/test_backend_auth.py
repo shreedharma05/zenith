@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 _tmp_dir = tempfile.TemporaryDirectory()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_dir.name}/test.db"
@@ -18,6 +19,14 @@ class AuthFlowTests(unittest.TestCase):
 
     def setUp(self):
         self.client = TestClient(app)
+        # Tests must never depend on -- or trigger -- a real SMTP send.
+        # Without this, whatever SMTP_HOST/USER/PASSWORD happen to be
+        # configured in the environment (e.g. a real Gmail relay) get used
+        # for real, spamming fake @example.com test addresses and bouncing
+        # back into the sender's own inbox.
+        self.send_email_patcher = patch("backend.auth_routes.send_email")
+        self.mock_send_email = self.send_email_patcher.start()
+        self.addCleanup(self.send_email_patcher.stop)
 
     def test_signup_requires_verification_before_search(self):
         response = self.client.post("/api/auth/signup", json={"email": "person@example.com", "password": "supersecret1"})
