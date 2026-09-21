@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth-shell";
+import { LoadingOverlay } from "@/components/loading-overlay";
 import { Button, Input } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 
@@ -43,35 +44,38 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthShell title="Create your account" subtitle="Start matching your resume to real openings.">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} />
-        <Input
-          type="email"
-          required
-          placeholder="Email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <Input
-          type="password"
-          required
-          minLength={8}
-          placeholder="Password (min 8 characters)"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={submitting} className="w-full">
-          {submitting ? "Creating account…" : "Create account"}
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-sm text-slate-600">
-        Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-blue-600">
-          Log in
-        </Link>
-      </p>
-    </AuthShell>
+    <>
+      <LoadingOverlay active={submitting} message="Creating your account..." percent={null} />
+      <AuthShell title="Create your account" subtitle="Start matching your resume to real openings.">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} />
+          <Input
+            type="email"
+            required
+            placeholder="Email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <Input
+            type="password"
+            required
+            minLength={8}
+            placeholder="Password (min 8 characters)"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={submitting} className="w-full">
+            {submitting ? "Creating account…" : "Create account"}
+          </Button>
+        </form>
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-blue-600">
+            Log in
+          </Link>
+        </p>
+      </AuthShell>
+    </>
   );
 }
