@@ -20,13 +20,17 @@ import threading
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
+from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from zenith import config as zconfig
 from zenith.profile_extractor import ProfileExtractionError
 from zenith.workflow import SearchResult, SearchSession
 
+from .database import get_db
 from .deps import get_current_verified_user
-from .models import User
+from .models import ResumeVersion, User
+from .resume_storage import load_resume, save_resume
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -37,6 +41,54 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 _ENRICH_BATCH_SIZE = 60
 
 _sessions: dict[int, SearchSession] = {}
+
+
+def _latest_resume(user: User, db: Session, resume_id: int | None) -> ResumeVersion | None:
+    if resume_id is not None:
+        saved = db.get(ResumeVersion, resume_id)
+        return saved if saved is not None and saved.user_id == user.id else None
+    return db.query(ResumeVersion).filter(ResumeVersion.user_id == user.id).order_by(
+        desc(ResumeVersion.created_at), desc(ResumeVersion.id)
+    ).first()
+
+
+async def _read_or_load_resume(
+    user: User, db: Session, resume: UploadFile | None, resume_id: int | None,
+) -> tuple[bytes, str]:
+    if resume is not None:
+        data = await resume.read()
+        filename = resume.filename or "resume.txt"
+        try:
+            object_key, object_version_id = save_resume(user.id, filename, data)
+        except Exception:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not save your resume. Please retry.") from None
+        db.add(ResumeVersion(
+            user_id=user.id,
+            object_key=object_key,
+            object_version_id=object_version_id,
+            filename=filename,
+        ))
+        db.commit()
+        return data, filename
+
+    saved = _latest_resume(user, db, resume_id)
+    if saved is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Upload a resume before searching.")
+    try:
+        return load_resume(saved.object_key, saved.object_version_id), saved.filename
+    except Exception:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Saved resume is temporarily unavailable.") from None
+
+
+@router.get("/resumes")
+def latest_resume(
+    user: User = Depends(get_current_verified_user),
+    db: Session = Depends(get_db),
+) -> dict | None:
+    saved = _latest_resume(user, db, None)
+    if saved is None:
+        return None
+    return {"id": saved.id, "filename": saved.filename, "created_at": saved.created_at.isoformat()}
 
 
 def _session_for(user: User) -> SearchSession:
@@ -85,14 +137,16 @@ def _serialize(outcome: SearchResult) -> dict:
 
 @router.post("")
 async def run_search(
-    resume: UploadFile = File(...),
+    resume: UploadFile | None = File(None),
+    resume_id: int | None = Form(None),
     locations: str = Form(""),
     time_posted: str = Form("r604800"),
     include_remote: bool = Form(True),
     force_refresh: bool = Form(False),
     user: User = Depends(get_current_verified_user),
+    db: Session = Depends(get_db),
 ) -> dict:
-    data = await resume.read()
+    data, filename = await _read_or_load_resume(user, db, resume, resume_id)
     session = _session_for(user)
     try:
         # session.run() is synchronous, blocking I/O (LLM calls, LinkedIn
@@ -102,7 +156,7 @@ async def run_search(
         outcome = await run_in_threadpool(
             session.run,
             data,
-            resume.filename or "resume.txt",
+            filename,
             zconfig.LLM_PROVIDER,
             [loc.strip() for loc in locations.split(",") if loc.strip()],
             time_posted,
@@ -150,16 +204,18 @@ def _progress_event(message: str) -> dict:
 
 @router.post("/stream")
 async def run_search_stream(
-    resume: UploadFile = File(...),
+    resume: UploadFile | None = File(None),
+    resume_id: int | None = Form(None),
     locations: str = Form(""),
     time_posted: str = Form("r604800"),
     include_remote: bool = Form(True),
     force_refresh: bool = Form(False),
     user: User = Depends(get_current_verified_user),
+    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Same search as POST /api/search, but streamed as Server-Sent Events
     so the client can show real progress instead of a simulated countdown."""
-    data = await resume.read()
+    data, filename = await _read_or_load_resume(user, db, resume, resume_id)
     session = _session_for(user)
     events: queue.Queue = queue.Queue()
 
@@ -170,7 +226,7 @@ async def run_search_stream(
         try:
             outcome = session.run(
                 data,
-                resume.filename or "resume.txt",
+                filename,
                 zconfig.LLM_PROVIDER,
                 [loc.strip() for loc in locations.split(",") if loc.strip()],
                 time_posted,

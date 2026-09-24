@@ -42,6 +42,12 @@ export type User = {
   is_verified: boolean;
 };
 
+export type ResumeMetadata = {
+  id: number;
+  filename: string;
+  created_at: string;
+};
+
 export type ScoredJobOut = {
   id: string;
   title: string;
@@ -129,6 +135,7 @@ export const api = {
     request<User>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   logout: () => request<MessageResponse>("/api/auth/logout", { method: "POST" }),
   me: () => request<User>("/api/auth/me"),
+  latestResume: () => request<ResumeMetadata | null>("/api/search/resumes"),
   resendVerification: () => request<MessageResponse>("/api/auth/resend-verification", { method: "POST" }),
   verifyEmail: (token: string) =>
     request<MessageResponse>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, { method: "POST" }),

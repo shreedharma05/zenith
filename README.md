@@ -55,6 +55,7 @@ Fill in `.env`:
 | `FRONTEND_URL` | yes | used for CORS and email links, e.g. `http://localhost:3000` |
 | `COOKIE_SECURE` | yes | `false` for local HTTP dev, `true` once served over HTTPS |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | for real email | any SMTP relay (Resend, SendGrid, Gmail App Password); if left blank, verification/reset emails are logged to the backend console instead of sent — handy for local dev |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_OBJECT_BUCKET` | yes for resume persistence | Cloudflare R2 S3 credentials and bucket. Resume versions use unique object keys managed by the application. `R2_ENDPOINT_URL` is optional and defaults to the account endpoint. |
 
 ### 2. Start the backend
 

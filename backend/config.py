@@ -1,4 +1,4 @@
-"""Settings for the web backend: auth, database, email, cookies.
+"""Settings for the web backend: auth, database, email, cookies, and R2.
 
 Kept separate from `zenith/config.py` (which governs resume parsing / LLM /
 job search, and is reusable independently of any particular frontend) since
@@ -44,6 +44,14 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "no-reply@zenith.local")
+
+# Resume versions are managed by the application with unique object keys, so
+# R2 bucket versioning is not required.
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
+R2_OBJECT_BUCKET = os.getenv("R2_OBJECT_BUCKET", "")
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL", "")
 
 
 def generate_dev_secret() -> str:

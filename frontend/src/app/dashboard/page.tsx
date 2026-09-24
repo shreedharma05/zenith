@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError, SearchResult } from "@/lib/api";
+import { api, ApiError, ResumeMetadata, SearchResult } from "@/lib/api";
 import { Button, Card } from "@/components/ui";
 import { LoadingOverlay } from "@/components/loading-overlay";
 
@@ -36,15 +36,23 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<SearchResult | null>(null);
   const [resendState, setResendState] = useState("");
+  const [savedResume, setSavedResume] = useState<ResumeMetadata | null>(null);
+  const [selectedFilename, setSelectedFilename] = useState("");
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
+  useEffect(() => {
+    if (!user) return;
+    api.latestResume().then(setSavedResume).catch(() => undefined);
+  }, [user]);
+
   async function runSearch(event?: React.FormEvent) {
     event?.preventDefault();
     const file = fileRef.current?.files?.[0];
-    if (!file) {
+    const savedResumeId = savedResume?.id;
+    if (!file && savedResumeId === undefined) {
       setError("Choose a resume file first.");
       return;
     }
@@ -54,7 +62,8 @@ export default function DashboardPage() {
     setProgressPercent(null);
     try {
       const form = new FormData();
-      form.append("resume", file);
+      if (file) form.append("resume", file);
+      else form.append("resume_id", String(savedResumeId));
       form.append("locations", locations);
       form.append("time_posted", TIME_OPTIONS[timeLabel]);
       form.append("include_remote", String(includeRemote));
@@ -72,6 +81,7 @@ export default function DashboardPage() {
         }
       });
       if (streamError) throw new ApiError(streamError, 0);
+      setSavedResume(await api.latestResume());
       setForceRefresh(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Search failed. Please retry.");
@@ -116,12 +126,27 @@ export default function DashboardPage() {
         <form onSubmit={runSearch} className="space-y-5">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">Resume (PDF, DOCX or TXT)</label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".pdf,.docx,.txt"
-              className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700"
-            />
+            <div className="relative flex min-h-12 items-center gap-3 rounded-xl border border-slate-300 bg-slate-950 px-4 py-2 text-sm text-white">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={(event) => setSelectedFilename(event.target.files?.[0]?.name ?? "")}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {selectedFilename || savedResume?.filename || "Choose a resume"}
+              </span>
+              {savedResume && !selectedFilename && (
+                <span className="shrink-0 rounded-full bg-cyan-300 px-3 py-1 text-xs font-bold text-slate-950">Last</span>
+              )}
+              <span className="shrink-0 rounded-full border border-white/30 px-3 py-1 text-xs font-semibold text-white">
+                Browse
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">
+              {selectedFilename ? "A new version will be saved for this search." : savedResume ? "Previously used resume" : "Your resume is stored securely after upload."}
+            </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
