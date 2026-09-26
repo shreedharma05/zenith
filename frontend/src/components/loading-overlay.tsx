@@ -27,6 +27,8 @@ export function LoadingOverlay({
 
   if (!active) return null;
 
+  const detailProgress = message.match(/^Reading job details (\d+)(\/\d+)$/);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-sm"
@@ -42,11 +44,15 @@ export function LoadingOverlay({
           {percent !== null && <span className="text-sm font-bold text-slate-900">{percent}%</span>}
         </div>
         <div>
-          <p key={message} className="zx-fade-in text-base font-semibold text-slate-900">
-            {message}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            This can take a little while for uncapped searches — hang tight.
+          <p className="text-base font-semibold text-slate-900">
+            {detailProgress ? (
+              <>
+                Reading job details <span key={detailProgress[1]} className="zx-fade-in">{detailProgress[1]}</span>
+                {detailProgress[2]}
+              </>
+            ) : (
+              message
+            )}
           </p>
         </div>
         <div className="h-1.5 w-48 overflow-hidden rounded-full bg-slate-100">

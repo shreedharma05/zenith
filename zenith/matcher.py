@@ -127,6 +127,29 @@ def _role_families(text: str) -> frozenset[str]:
     return frozenset(family for family, pattern in _ROLE_FAMILY_PATTERNS.items() if re.search(pattern, lowered))
 
 
+def _seniority_level(text: str) -> int | None:
+    lowered = text.lower()
+    if re.search(r"\b(?:assistant\s+)?vice\s+president\b|\bavp\b|\bvp\b|\bchief\b|\bhead\b|\bdirector\b", lowered):
+        return 4
+    if re.search(r"\b(?:lead|principal|staff|architect|manager)\b", lowered):
+        return 3
+    if re.search(r"\b(?:senior|sr\.?)\b", lowered):
+        return 2
+    if re.search(r"\b(?:mid[- ]level|intermediate)\b", lowered):
+        return 1
+    if re.search(r"\b(?:junior|jr\.?|entry[- ]level|intern)\b", lowered):
+        return 0
+    return None
+
+
+def _candidate_seniority_level(profile: CandidateProfile) -> int:
+    levels = {"junior": 0, "mid": 1, "senior": 2, "lead": 3}
+    candidate_title_level = _seniority_level(
+        f"{profile.current_title} {' '.join(profile.target_titles)}"
+    )
+    return max(levels.get(profile.seniority, 0), candidate_title_level or 0)
+
+
 _SECTION = re.compile(
     r"\b(?P<optional>nice[ -]to[ -]have|good[ -]to[ -]have|preferred (?:skills|qualifications)|desired skills|desirable)\b"
     r"|\b(?P<required>mandatory(?: skills(?: description)?)?|skills required|required (?:skills|qualifications)|"
@@ -269,11 +292,14 @@ def _evaluate_one(
     matched = list(matched_set)
 
     # --- gate 2: experience ---------------------------------------------
-    required = _required_years(job.description.lower())
+    required = _required_years(f"{job.title}\n{job.description}".lower())
     upper_limit = profile.total_years_experience
     experience_ok = required is None or required <= upper_limit
     if not experience_ok:
         return reject("Experience minimum not met")
+    job_seniority = _seniority_level(job.title)
+    if job_seniority is not None and job_seniority - _candidate_seniority_level(profile) >= 2:
+        return reject("Seniority level mismatch")
     if required is None and re.search(r"\b(?:lead|principal|staff|architect|manager)\b", job.title, re.I) and profile.seniority != "lead":
         return reject("Leadership eligibility unverified")
 

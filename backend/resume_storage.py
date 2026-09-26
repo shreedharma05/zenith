@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import mimetypes
+import logging
 import re
 from uuid import uuid4
 
 from . import config
+
+logger = logging.getLogger(__name__)
 
 
 def _client():
@@ -28,12 +31,13 @@ def save_resume(user_id: int, filename: str, data: bytes) -> tuple[str, str | No
     safe_filename = re.sub(r"[^A-Za-z0-9._-]+", "-", filename).strip(".-") or "resume.txt"
     object_key = f"users/{user_id}/resumes/{uuid4().hex}-{safe_filename}"
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    response = _client().put_object(
+    _client().put_object(
         Bucket=config.R2_OBJECT_BUCKET,
         Key=object_key,
         Body=data,
         ContentType=content_type,
     )
+    logger.info("Stored resume in R2 bucket=%s key=%s bytes=%d", config.R2_OBJECT_BUCKET, object_key, len(data))
     return object_key, None
 
 
@@ -42,4 +46,6 @@ def load_resume(object_key: str, object_version_id: str | None) -> bytes:
     if object_version_id:
         request["VersionId"] = object_version_id
     response = _client().get_object(**request)
-    return response["Body"].read()
+    data = response["Body"].read()
+    logger.info("Loaded resume from R2 bucket=%s key=%s bytes=%d", config.R2_OBJECT_BUCKET, object_key, len(data))
+    return data

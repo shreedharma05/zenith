@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import queue
 import re
 import threading
@@ -41,6 +42,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 _ENRICH_BATCH_SIZE = 60
 
 _sessions: dict[int, SearchSession] = {}
+logger = logging.getLogger(__name__)
 
 
 def _latest_resume(user: User, db: Session, resume_id: int | None) -> ResumeVersion | None:
@@ -60,7 +62,10 @@ async def _read_or_load_resume(
         filename = resume.filename or "resume.txt"
         try:
             object_key, object_version_id = save_resume(user.id, filename, data)
+        except RuntimeError as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from None
         except Exception:
+            logger.exception("Could not save resume for user %s", user.id)
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not save your resume. Please retry.") from None
         db.add(ResumeVersion(
             user_id=user.id,

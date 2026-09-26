@@ -82,6 +82,60 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(result.label, "Experience unverified")
         self.assertEqual(result.acceptance.must_have_matched, ["Java", "Spring Boot"])
 
+    def test_experience_range_in_title_is_used(self):
+        profile = CandidateProfile(skills=["Java", "Spring Boot"], primary_skills=["Java"], total_years_experience=3)
+        job = Job(
+            "title-experience",
+            "Java Developer (Spring boot, Rest API)_2-4 Yrs_Indore",
+            "Example",
+            "Indore",
+            "url",
+            "test",
+            description="Requirements: Java and Spring Boot.",
+        )
+        result = evaluate_jobs(profile, [job])[0]
+        self.assertEqual(result.acceptance.experience_required, 2)
+        self.assertNotEqual(result.label, "Experience unverified")
+
+    def test_mid_level_candidate_is_rejected_for_assistant_vice_president_title(self):
+        profile = CandidateProfile(
+            skills=["Java", "Spring Boot"],
+            primary_skills=["Java"],
+            total_years_experience=3,
+            seniority="mid",
+            current_title="Java Developer",
+        )
+        job = Job(
+            "avp",
+            "Java Applications Development - Assistant Vice President",
+            "Citi",
+            "Chennai",
+            "url",
+            "test",
+            description="Requirements: Java and Spring Boot.",
+        )
+        rejected = {}
+        self.assertEqual(evaluate_jobs(profile, [job], diagnostics=rejected), [])
+        self.assertEqual(rejected, {"Seniority level mismatch": 1})
+
+    def test_one_seniority_band_difference_remains_eligible(self):
+        profile = CandidateProfile(
+            skills=["Java", "Spring Boot"],
+            primary_skills=["Java"],
+            total_years_experience=3,
+            seniority="mid",
+        )
+        job = Job(
+            "senior-java",
+            "Senior Java Developer",
+            "Example",
+            "Chennai",
+            "url",
+            "test",
+            description="Requirements: Java and Spring Boot.",
+        )
+        self.assertEqual(len(evaluate_jobs(profile, [job])), 1)
+
     def test_generic_title_finds_requirements_after_long_blurb(self):
         job = Job("generic", "Software Engineer", "Example", "Chennai", "url", "test",
                   description="Our company serves its clients. " * 160 + "Required Skills: Java Spring Boot. 3 years experience. Preferred skills: Python.")

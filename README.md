@@ -60,12 +60,14 @@ Fill in `.env`:
 ### 2. Start the backend
 
 ```bash
-docker compose up -d zenith-api
+docker build -t zenith-api .
+mkdir -p .cache
+docker run -d --name zenith-api --env-file .env -p 8000:8000 \
+  -v "$PWD/.cache:/app/.cache" zenith-api
 ```
 
 This builds the image, applies database migrations (`create_all` on startup),
-and serves the API at <http://localhost:8000>. Check `docker compose logs -f
-zenith-api`.
+and serves the API at <http://localhost:8000>. Check `docker logs -f zenith-api`.
 
 ### 3. Start the frontend
 
@@ -90,10 +92,9 @@ frontend and backend are deployed on two different hosts.
   backend's URL.
 - **Backend**: needs a persistent server (not serverless) since a search can
   run for minutes — a small VM (e.g. Oracle Cloud's Always Free tier) running
-  `docker compose up -d zenith-api`, or a managed container host like
-  Render/Fly.io. An optional `caddy` Compose service (`docker compose --profile
-  prod up -d caddy zenith-api`) gets you free auto-TLS via
-  [sslip.io](https://sslip.io) if you don't have a domain yet.
+  the Docker image, or a managed container host like Render/Fly.io. Caddy can
+  be run separately with [Caddy](https://caddyserver.com/) using the included
+  `Caddyfile` if you need a TLS reverse proxy.
 - **Database**: [Neon](https://neon.tech) (serverless Postgres, free tier) or
   any Postgres instance. The engine uses `pool_pre_ping` to survive providers
   that silently close idle connections.
@@ -154,8 +155,9 @@ Backend/matching engine (Python):
 
 ```bash
 python -m unittest discover -s tests -v
-# or, inside Docker (recommended -- host Python may differ from the container's):
-docker compose exec -T zenith-api python -m unittest discover -s tests -v
+# or, inside the built image:
+docker run --rm --env-file .env -v "$PWD:/app" zenith-api \
+  python -m unittest discover -s tests -v
 ```
 
 Frontend build check:

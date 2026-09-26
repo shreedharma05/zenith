@@ -48,9 +48,9 @@ export default function DashboardPage() {
     api.latestResume().then(setSavedResume).catch(() => undefined);
   }, [user]);
 
-  async function runSearch(event?: React.FormEvent) {
+  async function runSearch(event?: React.FormEvent, continueSearch = false) {
     event?.preventDefault();
-    const file = fileRef.current?.files?.[0];
+    const file = continueSearch ? undefined : fileRef.current?.files?.[0];
     const savedResumeId = savedResume?.id;
     if (!file && savedResumeId === undefined) {
       setError("Choose a resume file first.");
@@ -58,7 +58,7 @@ export default function DashboardPage() {
     }
     setBusy(true);
     setError("");
-    setProgressMessage("Starting search…");
+    setProgressMessage(continueSearch ? "Continuing search…" : "Starting search…");
     setProgressPercent(null);
     try {
       const form = new FormData();
@@ -105,7 +105,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto w-full max-w-5xl px-6 py-12">
       <LoadingOverlay active={busy} message={progressMessage} percent={progressPercent} />
       <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Find your matching jobs</h1>
       <p className="mt-2 text-slate-600">Upload your resume and Zenith will surface real, currently open roles that fit.</p>
@@ -199,7 +199,7 @@ export default function DashboardPage() {
       </Card>
 
       {result && (
-        <div className="mt-10 space-y-6">
+        <div className="mt-10 w-full space-y-6">
           <div className="grid gap-4 sm:grid-cols-4">
             <Stat label="Discovered" value={result.fetched} />
             <Stat label="Described" value={result.enriched} />
@@ -214,7 +214,7 @@ export default function DashboardPage() {
           )}
 
           {result.can_continue && (
-            <Button variant="secondary" onClick={() => runSearch()} disabled={busy}>
+            <Button variant="secondary" onClick={() => runSearch(undefined, true)} disabled={busy}>
               {busy ? "Continuing…" : "Continue search (fetch more)"}
             </Button>
           )}
@@ -248,10 +248,10 @@ export default function DashboardPage() {
               </p>
             )}
             {result.matches.map((job) => (
-              <Card key={job.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-slate-900">{job.title}</h3>
+              <Card key={job.id} className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-3">
+                    <h3 className="min-w-0 wrap-break-word text-lg font-semibold text-slate-900">{job.title}</h3>
                     <span
                       className={`rounded-full border px-3 py-0.5 text-xs font-semibold ${
                         LABEL_STYLES[job.label] ?? "border-slate-200 bg-slate-100 text-slate-600"
@@ -264,7 +264,7 @@ export default function DashboardPage() {
                     {job.company} · {job.location}
                   </p>
                 </div>
-                <a href={job.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue-600 hover:underline">
+                <a href={job.url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-blue-600 hover:underline">
                   View listing →
                 </a>
               </Card>
