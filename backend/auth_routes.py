@@ -28,9 +28,12 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _COOKIE_KWARGS = dict(httponly=True, samesite="lax", secure=config.COOKIE_SECURE, path="/")
 
 
-def _set_session_cookie(response: Response, user_id: int) -> None:
+def _set_session_cookie(response: Response, user_id: int, remember: bool = True) -> None:
     token = security.create_access_token(user_id)
-    response.set_cookie("access_token", token, max_age=config.ACCESS_TOKEN_EXPIRE_MINUTES * 60, **_COOKIE_KWARGS)
+    # Unchecked "remember me" -> omit Max-Age so the browser treats it as a
+    # session cookie (cleared on browser close) instead of persisting 7 days.
+    max_age = config.ACCESS_TOKEN_EXPIRE_MINUTES * 60 if remember else None
+    response.set_cookie("access_token", token, max_age=max_age, **_COOKIE_KWARGS)
 
 
 def _send_verification_email(user: User) -> None:
@@ -68,7 +71,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
     user = db.query(User).filter(User.email == payload.email.lower()).first()
     if user is None or not security.verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password.")
-    _set_session_cookie(response, user.id)
+    _set_session_cookie(response, user.id, payload.remember)
     return user
 
 

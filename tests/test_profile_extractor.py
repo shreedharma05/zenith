@@ -43,7 +43,7 @@ class ProviderTests(unittest.TestCase):
 
     def test_openai_missing_key_fails_without_local_fallback(self):
         with patch.object(config, "OPENAI_API_KEY", ""), patch("zenith.profile_extractor._try_ollama") as local:
-            with self.assertRaisesRegex(ProfileExtractionError, "OPENAI_API_KEY"):
+            with self.assertRaisesRegex(ProfileExtractionError, "temporarily unavailable"):
                 extract_profile("Java", "openai")
         local.assert_not_called()
 

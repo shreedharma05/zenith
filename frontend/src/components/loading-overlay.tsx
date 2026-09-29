@@ -40,7 +40,7 @@ export function LoadingOverlay({
       <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-3xl border border-slate-200 bg-white px-10 py-12 text-center shadow-xl">
         <div className="relative flex h-16 w-16 items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
-          <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-blue-600 border-r-violet-600" />
+          <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-[#635bff] border-r-[#8b85ff]" />
           {percent !== null && <span className="text-sm font-bold text-slate-900">{percent}%</span>}
         </div>
         <div>
@@ -58,11 +58,11 @@ export function LoadingOverlay({
         <div className="h-1.5 w-48 overflow-hidden rounded-full bg-slate-100">
           {percent !== null ? (
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-600 to-violet-600 transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-[#635bff] transition-all duration-500 ease-out"
               style={{ width: `${percent}%` }}
             />
           ) : (
-            <div className="zx-indeterminate h-full w-1/3 rounded-full bg-gradient-to-r from-blue-600 to-violet-600" />
+            <div className="zx-indeterminate h-full w-1/3 rounded-full bg-[#635bff]" />
           )}
         </div>
       </div>

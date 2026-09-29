@@ -14,16 +14,14 @@ export default function Home() {
       <Nav />
       <main className="flex-1">
         <section className="relative overflow-hidden px-6 pb-32 pt-24 text-center">
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.15),_transparent_60%)]" />
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(99,91,255,0.14),_transparent_60%)]" />
           <div className="mx-auto max-w-3xl">
             <div className="mb-8 flex justify-center">
               <Badge>Now matching resumes to real openings</Badge>
             </div>
             <h1 className="text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl">
               Your resume in —{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
-                the jobs worth applying to, out.
-              </span>
+              <span className="text-[#635bff]">the jobs worth applying to, out.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-lg text-slate-600">
               Zenith reads your resume, finds real openings that actually fit your skills and experience, and tells
@@ -42,7 +40,7 @@ export default function Home() {
         <section id="how-it-works" className="mx-auto max-w-5xl px-6 pb-24">
           <div className="grid gap-6 sm:grid-cols-3">
             {STEPS.map((step) => (
-              <div key={step.title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div key={step.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h3 className="text-lg font-semibold text-slate-900">{step.title}</h3>
                 <p className="mt-2 text-sm text-slate-600">{step.body}</p>
               </div>

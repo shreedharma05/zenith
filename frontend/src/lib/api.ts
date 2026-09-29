@@ -131,8 +131,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password, full_name: fullName }),
     }),
-  login: (email: string, password: string) =>
-    request<User>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  login: (email: string, password: string, remember: boolean = true) =>
+    request<User>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password, remember }) }),
   logout: () => request<MessageResponse>("/api/auth/logout", { method: "POST" }),
   me: () => request<User>("/api/auth/me"),
   latestResume: () => request<ResumeMetadata | null>("/api/search/resumes"),

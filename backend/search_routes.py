@@ -41,8 +41,18 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 # which never restarts discovery/enrichment from scratch.
 _ENRICH_BATCH_SIZE = 60
 
+# Server-side cap independent of the UI's default -- protects the LinkedIn
+# discovery pipeline from a request that lists an unreasonable number of
+# locations (each spawns its own full pagination pass).
+_MAX_LOCATIONS = 10
+
 _sessions: dict[int, SearchSession] = {}
 logger = logging.getLogger(__name__)
+
+
+def _parse_locations(locations: str) -> list[str]:
+    parsed = [loc.strip() for loc in locations.split(",") if loc.strip()]
+    return parsed[:_MAX_LOCATIONS]
 
 
 def _latest_resume(user: User, db: Session, resume_id: int | None) -> ResumeVersion | None:
@@ -58,7 +68,13 @@ async def _read_or_load_resume(
     user: User, db: Session, resume: UploadFile | None, resume_id: int | None,
 ) -> tuple[bytes, str]:
     if resume is not None:
+        # Reject by the size Starlette already tracked while parsing the
+        # multipart body, before we ever buffer it fully or upload it to R2.
+        if resume.size is not None and resume.size > zconfig.MAX_RESUME_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Resume must be 10 MB or smaller.")
         data = await resume.read()
+        if len(data) > zconfig.MAX_RESUME_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Resume must be 10 MB or smaller.")
         filename = resume.filename or "resume.txt"
         try:
             object_key, object_version_id = save_resume(user.id, filename, data)
@@ -163,7 +179,7 @@ async def run_search(
             data,
             filename,
             zconfig.LLM_PROVIDER,
-            [loc.strip() for loc in locations.split(",") if loc.strip()],
+            _parse_locations(locations),
             time_posted,
             include_remote=include_remote,
             force_refresh=force_refresh,
@@ -233,7 +249,7 @@ async def run_search_stream(
                 data,
                 filename,
                 zconfig.LLM_PROVIDER,
-                [loc.strip() for loc in locations.split(",") if loc.strip()],
+                _parse_locations(locations),
                 time_posted,
                 include_remote=include_remote,
                 force_refresh=force_refresh,

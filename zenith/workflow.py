@@ -61,7 +61,7 @@ class SearchSession:
                config.OLLAMA_HOST if provider == "ollama" else "openai", EXTRACTOR_VERSION)
         if key == self._profile_key and self._profile is not None:
             return deepcopy(self._profile), True
-        if len(data) > 10 * 1024 * 1024:
+        if len(data) > config.MAX_RESUME_BYTES:
             raise ProfileExtractionError("Resume must be 10 MB or smaller.")
         try:
             text = extract_text(data, filename)
@@ -94,7 +94,7 @@ class SearchSession:
         """
         started = time.perf_counter()
         if progress:
-            progress(f"Reading resume and extracting profile with {'OpenAI' if provider == 'openai' else 'Local Ollama'}")
+            progress("Reading resume and extracting your profile")
         profile, profile_reused = self.get_profile(data, filename, provider)
         profile_finished = time.perf_counter()
         locations = list(dict.fromkeys(location.strip() for location in locations if location.strip()))

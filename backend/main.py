@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, models  # noqa: F401 (models import registers tables)
 from .auth_routes import router as auth_router
-from .database import Base, engine
+from .database import Base, engine, ensure_schema
+from .oauth_routes import router as oauth_router
 from .search_routes import router as search_router
 
 Base.metadata.create_all(bind=engine)
+ensure_schema()
 
 app = FastAPI(title="Zenith API")
 
@@ -23,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(oauth_router)
 app.include_router(search_router)
 
 

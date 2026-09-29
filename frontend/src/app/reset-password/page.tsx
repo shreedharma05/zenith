@@ -50,14 +50,20 @@ function ResetPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        type="password"
-        required
-        minLength={8}
-        placeholder="New password (min 8 characters)"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-      />
+      <div>
+        <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
+          New password
+        </label>
+        <Input
+          id="password"
+          type="password"
+          required
+          minLength={8}
+          placeholder="Min 8 characters"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={submitting} className="w-full">
         {submitting ? "Updating…" : "Update password"}

@@ -34,7 +34,7 @@ function VerifyEmailStatus() {
     <div className="space-y-4 text-sm">
       <p className={status === "error" ? "text-red-600" : "text-slate-700"}>{message}</p>
       {status === "success" && (
-        <Link href="/login" className="font-semibold text-blue-600">
+        <Link href="/login" className="font-semibold text-[#635bff]">
           Continue to login →
         </Link>
       )}

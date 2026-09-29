@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth-shell";
 import { LoadingOverlay } from "@/components/loading-overlay";
+import { OAuthButtons } from "@/components/oauth-buttons";
 import { Button, Input } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 
@@ -34,7 +35,7 @@ export default function SignupPage() {
       <AuthShell title="Check your inbox" subtitle={`We sent a verification link to ${email}.`}>
         <p className="text-sm text-slate-600">
           Click the link in that email to activate your account, then{" "}
-          <Link href="/login" className="font-semibold text-blue-600">
+          <Link href="/login" className="font-semibold text-[#635bff]">
             log in
           </Link>
           .
@@ -46,35 +47,56 @@ export default function SignupPage() {
   return (
     <>
       <LoadingOverlay active={submitting} message="Creating your account..." percent={null} />
-      <AuthShell title="Create your account" subtitle="Start matching your resume to real openings.">
+      <AuthShell
+        title="Create your account"
+        footer={
+          <>
+            Already have an account?{" "}
+            <Link href="/login" className="font-semibold text-[#635bff]">
+              Log in
+            </Link>
+          </>
+        }
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} />
-          <Input
-            type="email"
-            required
-            placeholder="Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <Input
-            type="password"
-            required
-            minLength={8}
-            placeholder="Password (min 8 characters)"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div>
+            <label htmlFor="full-name" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Full name
+            </label>
+            <Input id="full-name" value={fullName} onChange={(event) => setFullName(event.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Email
+            </label>
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Password
+            </label>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              placeholder="Min 8 characters"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" disabled={submitting} className="w-full">
             {submitting ? "Creating account…" : "Create account"}
           </Button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-600">
-          Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-blue-600">
-            Log in
-          </Link>
-        </p>
+        <OAuthButtons />
       </AuthShell>
     </>
   );

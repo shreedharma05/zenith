@@ -14,6 +14,7 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    remember: bool = True
 
 
 class UserOut(BaseModel):

@@ -37,6 +37,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./zenith.db")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").strip().lower() == "true"
 
+# "Sign in with Google/LinkedIn" (OAuth2 + OpenID Connect). Redirect URIs are
+# built from FRONTEND_URL (see oauth_routes.py) so the provider always sends
+# the browser back through the same-origin Next.js proxy -- keeping the
+# session cookie first-party, same reasoning as the rest of the auth flow.
+# Leave a provider's client id empty to hide its button / disable its routes.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
+LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
+
 # SMTP is optional in development: if SMTP_HOST is empty, emails are logged
 # instead of sent so signup/verify/reset flows are still testable locally.
 SMTP_HOST = os.getenv("SMTP_HOST", "")

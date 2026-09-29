@@ -43,7 +43,7 @@ class ProfileExtractionError(RuntimeError):
 def _messages(resume_text: str) -> list[dict[str, str]]:
     compact = "\n".join(re.sub(r"[ \t]+", " ", line).strip() for line in resume_text.splitlines() if line.strip())
     if len(compact) > config.RESUME_MAX_CHARS:
-        raise ProfileExtractionError("Resume text is too long for the configured model context. Use a shorter resume.")
+        raise ProfileExtractionError("Resume text is too long. Use a shorter resume.")
     return [{"role": "system", "content": _PROMPT}, {"role": "user", "content": compact}]
 
 
@@ -61,14 +61,14 @@ def extract_profile(resume_text: str, provider: str | None = None) -> CandidateP
     elif provider == "ollama":
         raw = _try_ollama(messages)
     else:
-        raise ProfileExtractionError("Choose Local Ollama or OpenAI.")
+        raise ProfileExtractionError("Resume analysis is not configured correctly. Please contact support.")
     if raw is not None:
         profile = _profile_from_dict(raw)
         profile.extraction_method = provider
     else:
         profile = _fallback_profile(resume_text)
         profile.extraction_method = "offline"
-        profile.extraction_warning = "Local model unavailable or returned an invalid profile. Used offline extraction; check the matching results carefully."
+        profile.extraction_warning = "We couldn't fully verify some details in your resume automatically. Review your matches carefully."
 
     profile.skills = _merge_skills(profile.skills, _scan_skills(resume_text))
     profile.primary_skills = _resolve_primary(profile.primary_skills, profile.skills, resume_text)
@@ -113,7 +113,7 @@ def _try_ollama(messages: list[dict[str, str]]) -> dict | None:
 
 def _try_openai(messages: list[dict[str, str]]) -> dict:
     if not config.OPENAI_API_KEY:
-        raise ProfileExtractionError("OPENAI_API_KEY is missing. Set it in .env and restart, or choose Local Ollama.")
+        raise ProfileExtractionError("Resume analysis is temporarily unavailable. Please try again shortly.")
     from openai import OpenAI, APIConnectionError, APIStatusError, AuthenticationError, RateLimitError
 
     try:
@@ -129,18 +129,18 @@ def _try_openai(messages: list[dict[str, str]]) -> dict:
             )
         choice = response.choices[0]
         if choice.finish_reason != "stop" or choice.message.refusal or not choice.message.content:
-            raise ProfileExtractionError("OpenAI did not return a complete profile. Retry or select another model.")
+            raise ProfileExtractionError("We couldn't fully analyze your resume. Please retry.")
         return _ProfileOutput.model_validate_json(choice.message.content).model_dump()
     except AuthenticationError:
-        raise ProfileExtractionError("OpenAI rejected the API key. Check .env and restart the app.") from None
+        raise ProfileExtractionError("Resume analysis is temporarily unavailable. Please try again shortly.") from None
     except RateLimitError:
-        raise ProfileExtractionError("OpenAI quota or rate limit reached. Check API billing or try Local Ollama.") from None
+        raise ProfileExtractionError("Resume analysis is busy right now. Please try again in a few minutes.") from None
     except APIConnectionError:
-        raise ProfileExtractionError("OpenAI could not be reached or timed out. Retry later.") from None
+        raise ProfileExtractionError("Resume analysis timed out. Please try again.") from None
     except APIStatusError:
-        raise ProfileExtractionError("OpenAI rejected the request. Check model access and structured-output support.") from None
+        raise ProfileExtractionError("We couldn't process your resume. Please retry.") from None
     except (ValidationError, ValueError, IndexError):
-        raise ProfileExtractionError("OpenAI returned an invalid profile. Retry or select another model.") from None
+        raise ProfileExtractionError("We couldn't fully analyze your resume. Please retry.") from None
 
 
 def _loads_lenient(text: str) -> dict | None:

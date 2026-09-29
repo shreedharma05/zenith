@@ -155,7 +155,7 @@ export default function DashboardPage() {
                 value={locations}
                 onChange={(event) => setLocations(event.target.value)}
                 placeholder="Chennai, Bengaluru"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#635bff] focus:ring-2 focus:ring-[#635bff]/20"
               />
             </div>
             <div>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
               <select
                 value={timeLabel}
                 onChange={(event) => setTimeLabel(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none focus:border-[#635bff] focus:ring-2 focus:ring-[#635bff]/20"
               >
                 {Object.keys(TIME_OPTIONS).map((label) => (
                   <option key={label}>{label}</option>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
                 type="checkbox"
                 checked={includeRemote}
                 onChange={(event) => setIncludeRemote(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-slate-300 text-[#635bff] focus:ring-[#635bff]"
               />
               Include remote
             </label>
@@ -186,7 +186,7 @@ export default function DashboardPage() {
                 type="checkbox"
                 checked={forceRefresh}
                 onChange={(event) => setForceRefresh(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-slate-300 text-[#635bff] focus:ring-[#635bff]"
               />
               Force refresh (ignore cache)
             </label>
@@ -264,7 +264,7 @@ export default function DashboardPage() {
                     {job.company} · {job.location}
                   </p>
                 </div>
-                <a href={job.url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-blue-600 hover:underline">
+                <a href={job.url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-[#635bff] hover:underline">
                   View listing →
                 </a>
               </Card>
