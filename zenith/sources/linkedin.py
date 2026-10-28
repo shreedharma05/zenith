@@ -43,12 +43,20 @@ _HEADERS = {
 
 
 class _RequestPacer:
-    """Space request starts across all workers and sessions in this process."""
+    """Space request starts across all workers and sessions in this process.
 
-    def __init__(self):
+    Each of `lanes` runs on its own delay clock, so up to `lanes` requests
+    can be in flight at once while each lane stays individually paced.
+    """
+
+    def __init__(self, lanes: int = 1):
         self.lock = threading.Lock()
-        self.next_start = 0.0
+        self.next_starts = [0.0] * max(1, lanes)
         self.blocked_until = 0.0
+
+    @property
+    def next_start(self) -> float:
+        return max(self.next_starts)
 
     def wait(self, delay_range: tuple[float, float]) -> bool:
         while True:
@@ -56,19 +64,20 @@ class _RequestPacer:
                 now = time.monotonic()
                 if now < self.blocked_until:
                     return False
-                delay = self.next_start - now
+                lane = min(range(len(self.next_starts)), key=self.next_starts.__getitem__)
+                delay = self.next_starts[lane] - now
                 if delay <= 0:
-                    self.next_start = now + random.uniform(*delay_range)
+                    self.next_starts[lane] = now + random.uniform(*delay_range)
                     return True
             threading.Event().wait(min(delay, 0.25))
 
     def cooldown(self, seconds: float) -> None:
         with self.lock:
             self.blocked_until = max(self.blocked_until, time.monotonic() + seconds)
-            self.next_start = max(self.next_start, self.blocked_until)
+            self.next_starts = [max(start, self.blocked_until) for start in self.next_starts]
 
 
-_PACER = _RequestPacer()
+_PACER = _RequestPacer(lanes=config.FETCH_WORKERS)
 _ACCESS_PAUSED = (
     "LinkedIn rate-limited or blocked requests. Results are partial; cached pages remain available. "
     "Pause searches for at least 5 minutes (longer if LinkedIn requests it), then retry with Force refresh off. "

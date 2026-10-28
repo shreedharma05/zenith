@@ -50,6 +50,7 @@ Fill in `.env`:
 | `ZENITH_LLM_PROVIDER` | yes | `openai` (recommended) or `ollama` |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | if using OpenAI | |
 | `OLLAMA_HOST` / `ZENITH_MODEL` | if using Ollama | point at any reachable Ollama server |
+| `ZENITH_REQUEST_DELAY_MIN` / `ZENITH_REQUEST_DELAY_MAX` / `ZENITH_FETCH_WORKERS` | optional | LinkedIn request pacing: seconds between requests per worker (defaults `1.0` / `2.0`) and number of parallel workers (default `3`). Overall rate is about workers ÷ average delay; lower it if LinkedIn returns 429/403 |
 | `AUTH_SECRET_KEY` | yes | generate with `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL` | yes | Postgres connection string (e.g. [Neon](https://neon.tech), free tier); defaults to a local SQLite file if unset |
 | `FRONTEND_URL` | yes | used for CORS and email links, e.g. `http://localhost:3000` |

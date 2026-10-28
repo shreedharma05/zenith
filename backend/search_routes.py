@@ -45,6 +45,11 @@ _ENRICH_BATCH_SIZE = 60
 # locations (each spawns its own full pagination pass).
 _MAX_LOCATIONS = 10
 
+# Discovery walks LinkedIn result pages (newest first) one paced request at a
+# time, so an uncapped location can cost minutes for jobs that are then never
+# described or matched. Only the newest N per location are collected.
+_MAX_JOBS_PER_LOCATION = 150
+
 _sessions: dict[int, SearchSession] = {}
 logger = logging.getLogger(__name__)
 
@@ -182,6 +187,7 @@ async def run_search(
             time_posted,
             include_remote=include_remote,
             force_refresh=force_refresh,
+            per_location=_MAX_JOBS_PER_LOCATION,
             enrich_limit=_ENRICH_BATCH_SIZE,
         )
     except ProfileExtractionError as exc:
@@ -310,6 +316,7 @@ async def start_search_job(
     search_kwargs = {
         "include_remote": include_remote,
         "force_refresh": force_refresh,
+        "per_location": _MAX_JOBS_PER_LOCATION,
         "enrich_limit": _ENRICH_BATCH_SIZE,
     }
     threading.Thread(target=_run_job, args=(job, session, search_args, search_kwargs), daemon=True).start()

@@ -37,9 +37,15 @@ TIME_RANGE_OPTIONS = {
     "Any time": "",
 }
 
-# Be polite: seconds to wait between LinkedIn requests (min, max).
-REQUEST_DELAY_RANGE = (1.2, 2.8)
-FETCH_WORKERS = 3
+# Be polite: seconds between request starts *per worker lane* (min, max).
+# Total rate is roughly FETCH_WORKERS / average delay requests per second,
+# shared by every search in the process. Raise the delay or lower the workers
+# if LinkedIn starts returning 429/403.
+REQUEST_DELAY_RANGE = (
+    float(os.getenv("ZENITH_REQUEST_DELAY_MIN", "1.0")),
+    float(os.getenv("ZENITH_REQUEST_DELAY_MAX", "2.0")),
+)
+FETCH_WORKERS = int(os.getenv("ZENITH_FETCH_WORKERS", "3"))
 REQUEST_COOLDOWN_SECONDS = 5 * 60
 
 # Simple on-disk cache so re-running does not re-hit the network.

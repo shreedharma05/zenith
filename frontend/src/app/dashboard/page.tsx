@@ -126,11 +126,18 @@ export default function DashboardPage() {
       form.append("time_posted", TIME_OPTIONS[timeLabel]);
       form.append("include_remote", String(includeRemote));
       form.append("force_refresh", String(forceRefresh));
-      const { job_id } = await api.startSearch(form);
+      const { job_id } = await api.startSearch(form).catch(async (err) => {
+        // A search from before a reload/drop is still running: follow it instead of failing.
+        if (!(err instanceof ApiError) || err.status !== 409) throw err;
+        const running = await api.activeSearchJob();
+        if (!running) throw err;
+        return { job_id: running.id };
+      });
       await pollSearch(job_id);
       api.latestResume().then(setSavedResume).catch(() => undefined);
       setForceRefresh(false);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) router.replace("/login");
       setError(err instanceof ApiError ? err.message : "Search failed. Please retry.");
     } finally {
       setBusy(false);
