@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError, ResumeMetadata, SearchResult } from "@/lib/api";
+import { api, ApiError, ResumeMetadata, SearchJob, SearchResult } from "@/lib/api";
 import { Button, Card } from "@/components/ui";
 import { LoadingOverlay } from "@/components/loading-overlay";
 
@@ -21,6 +21,13 @@ const LABEL_STYLES: Record<string, string> = {
   "Worth a look": "bg-amber-50 text-amber-700 border-amber-200",
   "Experience unverified": "bg-slate-100 text-slate-600 border-slate-200",
 };
+
+const POLL_INTERVAL_MS = 1500;
+// Consecutive failed status checks tolerated before giving up -- the search
+// keeps running on the server through a brief network blip.
+const MAX_POLL_FAILURES = 8;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -43,10 +50,61 @@ export default function DashboardPage() {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     api.latestResume().then(setSavedResume).catch(() => undefined);
+    if (!user.is_verified) return;
+    // Re-attach to a search that was still running when the page was reloaded.
+    api
+      .activeSearchJob()
+      .then(async (job) => {
+        if (!job) return;
+        setBusy(true);
+        setError("");
+        try {
+          await pollSearch(job.id);
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : "Search failed. Please retry.");
+        } finally {
+          setBusy(false);
+        }
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function pollSearch(jobId: string) {
+    let failures = 0;
+    while (!unmounted.current) {
+      let job: SearchJob;
+      try {
+        job = await api.searchJob(jobId);
+        failures = 0;
+      } catch (err) {
+        const transient = err instanceof ApiError && (err.status === 0 || err.status >= 500);
+        if (!transient || ++failures >= MAX_POLL_FAILURES) throw err;
+        await sleep(POLL_INTERVAL_MS);
+        continue;
+      }
+      if (job.status === "error") throw new ApiError(job.error ?? "Search failed. Please retry.", 0);
+      if (job.status === "done" && job.result) {
+        setProgressPercent(100);
+        setResult(job.result);
+        return;
+      }
+      setProgressMessage(job.message);
+      setProgressPercent(job.percent);
+      await sleep(POLL_INTERVAL_MS);
+    }
+  }
 
   async function runSearch(event?: React.FormEvent, continueSearch = false) {
     event?.preventDefault();
@@ -68,20 +126,9 @@ export default function DashboardPage() {
       form.append("time_posted", TIME_OPTIONS[timeLabel]);
       form.append("include_remote", String(includeRemote));
       form.append("force_refresh", String(forceRefresh));
-      let streamError: string | null = null;
-      await api.searchStream(form, (streamEvent) => {
-        if (streamEvent.type === "progress") {
-          setProgressMessage(streamEvent.message);
-          setProgressPercent(streamEvent.percent);
-        } else if (streamEvent.type === "done") {
-          setProgressPercent(100);
-          setResult(streamEvent.result);
-        } else {
-          streamError = streamEvent.message;
-        }
-      });
-      if (streamError) throw new ApiError(streamError, 0);
-      setSavedResume(await api.latestResume());
+      const { job_id } = await api.startSearch(form);
+      await pollSearch(job_id);
+      api.latestResume().then(setSavedResume).catch(() => undefined);
       setForceRefresh(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Search failed. Please retry.");

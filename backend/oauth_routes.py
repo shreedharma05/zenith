@@ -14,7 +14,7 @@ import secrets
 from urllib.parse import urlencode
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -62,7 +62,7 @@ def _login_error_redirect(message: str) -> RedirectResponse:
 def oauth_start(provider: str) -> RedirectResponse:
     settings = _PROVIDERS.get(provider)
     if settings is None or not settings["client_id"]:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sign-in provider not available.")
+        return _login_error_redirect("Sign-in provider not available.")
     state = secrets.token_urlsafe(24)
     params = {
         "client_id": settings["client_id"],

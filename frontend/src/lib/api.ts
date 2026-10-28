@@ -10,8 +10,42 @@ export class ApiError extends Error {
   }
 }
 
+// Turns a failed response into a user-readable message: handles FastAPI's
+// string `detail`, 422 validation-error lists, and non-JSON bodies (HTML
+// error pages from a proxy/host) that would otherwise surface as raw
+// status text.
+async function errorMessage(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+    if (typeof data.detail === "string" && data.detail) return data.detail;
+    if (Array.isArray(data.detail)) {
+      const messages = data.detail
+        .map((item: { msg?: unknown }) => (typeof item?.msg === "string" ? item.msg : ""))
+        .filter(Boolean);
+      if (messages.length) return messages.join(" ");
+    }
+  } catch {
+    // no JSON body
+  }
+  if (response.status === 401) return "Your session has expired. Please sign in again.";
+  if (response.status === 413) return "The file is too large.";
+  if (response.status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (response.status >= 500) return "The server had a problem or is unreachable. Please try again shortly.";
+  return response.statusText || "Request failed. Please try again.";
+}
+
+// fetch() rejects (instead of returning a response) when the server can't be
+// reached at all; status 0 marks that case.
+async function safeFetch(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw new ApiError("Can't reach the server. Check your connection and try again.", 0);
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await safeFetch(`${API_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -20,14 +54,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
   if (!response.ok) {
-    let message: string = response.statusText;
-    try {
-      const data = await response.json();
-      if (typeof data.detail === "string") message = data.detail;
-    } catch {
-      // response had no JSON body; fall back to statusText
-    }
-    throw new ApiError(message, response.status);
+    throw new ApiError(await errorMessage(response), response.status);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -83,47 +110,16 @@ export type SearchResult = {
 
 type MessageResponse = { message: string };
 
-export type StreamEvent =
-  | { type: "progress"; message: string; percent: number | null }
-  | { type: "done"; result: SearchResult }
-  | { type: "error"; message: string };
-
-// Manual SSE parsing (not EventSource) because EventSource can't send the
-// POST body a resume file upload needs. Calls onEvent for each event as it
-// arrives so the caller can show real, incremental progress.
-async function searchStream(form: FormData, onEvent: (event: StreamEvent) => void): Promise<void> {
-  const response = await fetch(`${API_URL}/api/search/stream`, {
-    method: "POST",
-    credentials: "include",
-    body: form,
-  });
-  if (!response.ok || !response.body) {
-    let message = response.statusText || "Search failed to start.";
-    try {
-      const data = await response.json();
-      if (typeof data.detail === "string") message = data.detail;
-    } catch {
-      // no JSON body
-    }
-    throw new ApiError(message, response.status);
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split("\n\n");
-    buffer = chunks.pop() ?? "";
-    for (const chunk of chunks) {
-      const line = chunk.trim();
-      if (!line.startsWith("data:")) continue;
-      const jsonText = line.slice(5).trim();
-      if (jsonText) onEvent(JSON.parse(jsonText) as StreamEvent);
-    }
-  }
-}
+// A search runs as a background job on the server (it can take minutes, far
+// longer than a single HTTP request survives); the client polls its status.
+export type SearchJob = {
+  id: string;
+  status: "running" | "done" | "error";
+  message: string;
+  percent: number | null;
+  result: SearchResult | null;
+  error: string | null;
+};
 
 export const api = {
   signup: (email: string, password: string, fullName: string) =>
@@ -144,5 +140,7 @@ export const api = {
   resetPassword: (token: string, password: string) =>
     request<MessageResponse>("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ token, password }) }),
   search: (form: FormData) => request<SearchResult>("/api/search", { method: "POST", body: form }),
-  searchStream,
+  startSearch: (form: FormData) => request<{ job_id: string }>("/api/search/jobs", { method: "POST", body: form }),
+  searchJob: (jobId: string) => request<SearchJob>(`/api/search/jobs/${encodeURIComponent(jobId)}`),
+  activeSearchJob: () => request<SearchJob | null>("/api/search/jobs/active"),
 };

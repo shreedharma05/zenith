@@ -11,15 +11,14 @@ shared store such as Redis).
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-import queue
 import re
 import threading
+import time
+import uuid
+from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -223,8 +222,68 @@ def _progress_event(message: str) -> dict:
     return {"type": "progress", "message": message, "percent": None}
 
 
-@router.post("/stream")
-async def run_search_stream(
+@dataclass
+class _SearchJob:
+    id: str
+    user_id: int
+    status: str = "running"  # running | done | error
+    message: str = "Starting search…"
+    percent: int | None = None
+    result: dict | None = None
+    error: str | None = None
+    updated_at: float = 0.0
+
+
+# A search can take minutes, longer than proxies/hosts keep a single HTTP
+# request open. So it runs in a background thread and the client polls short
+# requests for its status, which also survives a page refresh or a dropped
+# connection. Process-local, like `_sessions`.
+_JOB_RETENTION_SECONDS = 60 * 60
+_jobs: dict[str, _SearchJob] = {}
+_jobs_lock = threading.Lock()
+
+
+def _job_payload(job: _SearchJob) -> dict:
+    return {
+        "id": job.id,
+        "status": job.status,
+        "message": job.message,
+        "percent": job.percent,
+        "result": job.result,
+        "error": job.error,
+    }
+
+
+def _running_job(user_id: int) -> _SearchJob | None:
+    return next((j for j in _jobs.values() if j.user_id == user_id and j.status == "running"), None)
+
+
+def _run_job(job: _SearchJob, session: SearchSession, search_args: tuple, search_kwargs: dict) -> None:
+    def progress(message: str) -> None:
+        event = _progress_event(message)
+        with _jobs_lock:
+            job.message = event["message"]
+            job.percent = event["percent"]
+            job.updated_at = time.time()
+
+    try:
+        outcome = session.run(*search_args, progress=progress, **search_kwargs)
+        result, error = _serialize(outcome), None
+    except ProfileExtractionError as exc:
+        result, error = None, str(exc)
+    except Exception:
+        logger.exception("Search failed for user %s", job.user_id)
+        result, error = None, "Search failed. Please retry."
+    with _jobs_lock:
+        job.result, job.error = result, error
+        job.status = "done" if error is None else "error"
+        if error is None:
+            job.percent = 100
+        job.updated_at = time.time()
+
+
+@router.post("/jobs", status_code=status.HTTP_202_ACCEPTED)
+async def start_search_job(
     resume: UploadFile | None = File(None),
     resume_id: int | None = Form(None),
     locations: str = Form(""),
@@ -233,45 +292,43 @@ async def run_search_stream(
     force_refresh: bool = Form(False),
     user: User = Depends(get_current_verified_user),
     db: Session = Depends(get_db),
-) -> StreamingResponse:
-    """Same search as POST /api/search, but streamed as Server-Sent Events
-    so the client can show real progress instead of a simulated countdown."""
+) -> dict:
+    with _jobs_lock:
+        if _running_job(user.id) is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "A search is already running. Please wait for it to finish.")
     data, filename = await _read_or_load_resume(user, db, resume, resume_id)
     session = _session_for(user)
-    events: queue.Queue = queue.Queue()
+    job = _SearchJob(id=uuid.uuid4().hex, user_id=user.id, updated_at=time.time())
+    with _jobs_lock:
+        if _running_job(user.id) is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "A search is already running. Please wait for it to finish.")
+        cutoff = time.time() - _JOB_RETENTION_SECONDS
+        for stale_id in [j.id for j in _jobs.values() if j.status != "running" and j.updated_at < cutoff]:
+            del _jobs[stale_id]
+        _jobs[job.id] = job
+    search_args = (data, filename, zconfig.LLM_PROVIDER, _parse_locations(locations), time_posted)
+    search_kwargs = {
+        "include_remote": include_remote,
+        "force_refresh": force_refresh,
+        "enrich_limit": _ENRICH_BATCH_SIZE,
+    }
+    threading.Thread(target=_run_job, args=(job, session, search_args, search_kwargs), daemon=True).start()
+    return {"job_id": job.id}
 
-    def progress(message: str) -> None:
-        events.put(_progress_event(message))
 
-    def worker() -> None:
-        try:
-            outcome = session.run(
-                data,
-                filename,
-                zconfig.LLM_PROVIDER,
-                _parse_locations(locations),
-                time_posted,
-                include_remote=include_remote,
-                force_refresh=force_refresh,
-                progress=progress,
-                enrich_limit=_ENRICH_BATCH_SIZE,
+@router.get("/jobs/active")
+def active_search_job(user: User = Depends(get_current_verified_user)) -> dict | None:
+    with _jobs_lock:
+        job = _running_job(user.id)
+        return _job_payload(job) if job is not None else None
+
+
+@router.get("/jobs/{job_id}")
+def get_search_job(job_id: str, user: User = Depends(get_current_verified_user)) -> dict:
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is None or job.user_id != user.id:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "This search is no longer available (the server may have restarted). Please retry.",
             )
-            events.put({"type": "done", "result": _serialize(outcome)})
-        except ProfileExtractionError as exc:
-            events.put({"type": "error", "message": str(exc)})
-        except Exception:
-            events.put({"type": "error", "message": "Search failed. Please retry."})
-        finally:
-            events.put(None)
-
-    threading.Thread(target=worker, daemon=True).start()
-
-    async def event_stream():
-        loop = asyncio.get_event_loop()
-        while True:
-            item = await loop.run_in_executor(None, events.get)
-            if item is None:
-                break
-            yield f"data: {json.dumps(item)}\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+        return _job_payload(job)

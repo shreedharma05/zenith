@@ -14,12 +14,16 @@ const MAX_BODY_BYTES = 15 * 1024 * 1024;
 
 export const dynamic = "force-dynamic";
 
+function jsonError(detail: string, status: number): Response {
+  return Response.json({ detail }, { status });
+}
+
 async function proxy(request: NextRequest, path: string[]): Promise<Response> {
   const target = `${BACKEND_URL}/api/${path.join("/")}${request.nextUrl.search}`;
 
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (declaredLength > MAX_BODY_BYTES) {
-    return new Response("Request body too large.", { status: 413 });
+    return jsonError("The file is too large. Resumes must be 10 MB or smaller.", 413);
   }
 
   const headers = new Headers(request.headers);
@@ -31,7 +35,12 @@ async function proxy(request: NextRequest, path: string[]): Promise<Response> {
     init.body = await request.arrayBuffer();
   }
 
-  const upstream = await fetch(target, init);
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, init);
+  } catch {
+    return jsonError("The server is unreachable right now. Please try again shortly.", 502);
+  }
   const responseHeaders = new Headers(upstream.headers);
   responseHeaders.delete("content-encoding");
   responseHeaders.delete("content-length");
