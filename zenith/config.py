@@ -42,10 +42,10 @@ TIME_RANGE_OPTIONS = {
 # shared by every search in the process. Raise the delay or lower the workers
 # if LinkedIn starts returning 429/403.
 REQUEST_DELAY_RANGE = (
-    float(os.getenv("ZENITH_REQUEST_DELAY_MIN", "1.0")),
-    float(os.getenv("ZENITH_REQUEST_DELAY_MAX", "2.0")),
+    float(os.getenv("ZENITH_REQUEST_DELAY_MIN", "2.0")),
+    float(os.getenv("ZENITH_REQUEST_DELAY_MAX", "4.0")),
 )
-FETCH_WORKERS = int(os.getenv("ZENITH_FETCH_WORKERS", "3"))
+FETCH_WORKERS = int(os.getenv("ZENITH_FETCH_WORKERS", "2"))
 REQUEST_COOLDOWN_SECONDS = 5 * 60
 
 # Simple on-disk cache so re-running does not re-hit the network.
